@@ -14,13 +14,8 @@ pandas==2.2.2
 openpyxl==3.1.2
 numpy==1.26.4
 
-# Audio/Whisper
+# Audio
 pydub==0.25.1
 
-# Whisper: Use git version for better build compatibility
-# OR use newer release if available
-openai-whisper @ git+https://github.com/openai/whisper.git@v20231117
-
-# Build dependencies (ensure available during wheel build)
-setuptools>=68.0.0
-wheel>=0.42.0
+# ⚠️ REMOVE or COMMENT OUT whisper from here:
+# openai-whisper==20231117
