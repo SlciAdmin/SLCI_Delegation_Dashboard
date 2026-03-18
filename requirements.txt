@@ -3,7 +3,7 @@ Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.2
 Werkzeug==2.3.7
 python-dotenv==1.0.0
-pandas==2.1.0
+pandas==2.2.2
 openpyxl==3.1.2
 openai-whisper==20231117
 pydub==0.25.1
