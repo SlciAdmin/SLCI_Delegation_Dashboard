@@ -4,12 +4,14 @@ SLCI Delegation Dashboard - Complete Flask Backend
 ✅ WhatsApp notifications with PREVIEW + DOWNLOAD links
 ✅ Full task details in messages
 ✅ Proper newline formatting for WhatsApp
-✅ FIXED: URL path separator + WhatsApp link + file serving
+✅ FIXED: SSL Database Connection + URL path separator + WhatsApp link + file serving
+✅ Render.com Production Ready
 """
 import os
 import urllib.parse
 import uuid
 import json
+import time
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, make_response, abort
 from flask_sqlalchemy import SQLAlchemy
@@ -26,16 +28,36 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ============ CONFIGURATION ============
+# ============ ✅ CONFIGURATION - FIXED FOR RENDER + SSL ============
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key_change_in_production')
+
+# ✅ FIXED: Build PostgreSQL URL with SSL + URL-encoded password
+from urllib.parse import quote_plus
+
+db_user = os.getenv('DB_USER', 'postgres')
+db_password = quote_plus(os.getenv('DB_PASSWORD', 'SLCI123'))  # ✅ URL-encode special chars
+db_host = os.getenv('DB_HOST', 'localhost')
+db_port = os.getenv('DB_PORT', '5432')
+db_name = os.getenv('DB_NAME', 'Delegation_db')
+
+# ✅ FIXED: Add sslmode=require to URI for Render Postgres
 app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://{os.getenv('DB_USER', 'postgres')}:"
-    f"{os.getenv('DB_PASSWORD', 'SLCI123')}@"
-    f"{os.getenv('DB_HOST', 'localhost')}:"
-    f"{os.getenv('DB_PORT', '5432')}/"
-    f"{os.getenv('DB_NAME', 'Delegation_db')}"
+    f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
 )
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# ✅ FIXED: Complete engine options with SSL + connection pooling + schema
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,           # ✅ Auto-reconnect on stale connections (Render cold starts)
+    'pool_recycle': 300,             # ✅ Recycle connections every 5 minutes
+    'connect_args': {
+        'sslmode': 'require',        # ✅ Enforce SSL for Render Postgres
+        'connect_timeout': 10,       # ✅ Timeout after 10 seconds
+        'options': '-csearch_path=delegation,public'  # ✅ Keep your custom schema
+    }
+}
+
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))
 
@@ -44,6 +66,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'admin_files'), exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'employee_files'), exist_ok=True)
 
+# Initialize extensions
 db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -54,9 +77,27 @@ login_manager.login_message_category = "info"
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# Create tables
-with app.app_context():
-    db.create_all()
+# ✅ Create tables with retry logic for Render cold starts
+def init_database():
+    """Initialize database with retry logic for Render"""
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                db.create_all()
+            print(f"✅ Database tables created (attempt {attempt + 1})")
+            return True
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"⏳ Waiting for database... ({attempt + 1}/{max_retries}) - {e}")
+                time.sleep(wait)
+            else:
+                print(f"❌ Database init failed after {max_retries} attempts: {e}")
+                raise
+    return False
+
+init_database()
 
 # ============ ✅ HELPER FUNCTIONS (FULLY FIXED) ============
 def generate_whatsapp_link(phone_number, message):
@@ -72,11 +113,7 @@ def generate_whatsapp_link(phone_number, message):
     # ✅ FIXED: Removed extra spaces in WhatsApp URL
     return f"https://wa.me/{clean_phone}?text={encoded_message}"
 
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "connect_args": {
-        "options": "-csearch_path=delegation,public"
-    }
-}
+
 def generate_task_id():
     """Generate unique task ID like TASK-2026-001"""
     year = datetime.now().year
@@ -876,7 +913,7 @@ def internal_error(error):
 if __name__ == "__main__":
     debug = os.getenv('FLASK_DEBUG', '0') == '1'
     host = '0.0.0.0' if os.getenv('FLASK_ENV') == 'production' else '127.0.0.1'
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 10000))
     print(f"🚀 Starting SLCI Dashboard on http://{host}:{port}")
     print(f"📊 Features: Admin Panel • Employee Tasks • Reports • Charts • Export • Voice • Dark Mode")
     print(f"💬 WhatsApp: Full details + 👁️ Preview + 📥 Download links ✅")
