@@ -16,6 +16,7 @@ numpy==1.26.4
 
 # Audio
 pydub==0.25.1
+psycopg2-binary==2.9.11
 
 # ⚠️ REMOVE or COMMENT OUT whisper from here:
 # openai-whisper==20231117
