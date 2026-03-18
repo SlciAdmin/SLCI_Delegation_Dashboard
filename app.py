@@ -5,7 +5,8 @@ SLCI Delegation Dashboard - Complete Flask Backend
 ✅ Full task details in messages
 ✅ Proper newline formatting for WhatsApp
 ✅ FIXED: SSL Database Connection + URL path separator + WhatsApp link + file serving
-✅ Render.com Production Ready
+✅ Render.com Production Ready - Internal DB URL Support
+✅ Database Health Check Endpoint
 """
 import os
 import urllib.parse
@@ -28,33 +29,39 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ============ ✅ CONFIGURATION - FIXED FOR RENDER + SSL ============
+# ============ ✅ CONFIGURATION - FIXED FOR RENDER INTERNAL DB ============
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key_change_in_production')
 
-# ✅ FIXED: Build PostgreSQL URL with SSL + URL-encoded password
-from urllib.parse import quote_plus
+# ✅ FIXED: Use internal DATABASE_URL if available (no SSL needed for Render internal)
+from urllib.parse import quote_plus, urlparse, parse_qs
 
-db_user = os.getenv('DB_USER', 'postgres')
-db_password = quote_plus(os.getenv('DB_PASSWORD', 'SLCI123'))  # ✅ URL-encode special chars
-db_host = os.getenv('DB_HOST', 'localhost')
-db_port = os.getenv('DB_PORT', '5432')
-db_name = os.getenv('DB_NAME', 'Delegation_db')
-
-# ✅ FIXED: Add sslmode=require to URI for Render Postgres
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
-)
+# Option 1: Use internal DATABASE_URL (preferred for Render-to-Render connections)
+if os.getenv('USE_INTERNAL_DB') == 'true' and os.getenv('DATABASE_URL'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    print(f"🔗 Using internal DATABASE_URL for Render")
+else:
+    # Option 2: Fallback to individual env vars with SSL for external connections
+    db_user = os.getenv('DB_USER', 'postgres')
+    db_password = quote_plus(os.getenv('DB_PASSWORD', 'SLCI123'))  # ✅ URL-encode special chars
+    db_host = os.getenv('DB_HOST', 'localhost')
+    db_port = os.getenv('DB_PORT', '5432')
+    db_name = os.getenv('DB_NAME', 'Delegation_db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
+    )
+    print(f"🔗 Using individual DB vars with SSL mode")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ✅ FIXED: Complete engine options with SSL + connection pooling + schema
+# ✅ FIXED: Complete engine options with connection pooling + schema
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,           # ✅ Auto-reconnect on stale connections (Render cold starts)
     'pool_recycle': 300,             # ✅ Recycle connections every 5 minutes
+    'pool_timeout': 30,              # ✅ Wait up to 30s for connection
+    'max_overflow': 10,              # ✅ Allow 10 extra connections during spikes
     'connect_args': {
-        'sslmode': 'require',        # ✅ Enforce SSL for Render Postgres
         'connect_timeout': 10,       # ✅ Timeout after 10 seconds
-        'options': '-csearch_path=delegation,public'  # ✅ Keep your custom schema
+        'options': '-csearch_path=delegation,public'  # ✅ Your custom schema
     }
 }
 
@@ -805,6 +812,21 @@ def download_file(filename):
     )
 
 
+# ============ ✅ DATABASE HEALTH CHECK ENDPOINT ============
+@app.route('/health/db')
+@login_required
+def health_db():
+    """Check database connection health - NEW ENDPOINT"""
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return jsonify({'status': 'healthy', 'database': 'connected', 'uri_used': 'internal' if os.getenv('USE_INTERNAL_DB') == 'true' else 'external'}), 200
+    except Exception as e:
+        app.logger.error(f"DB health check failed: {str(e)}")
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 503
+
+
 # ============ VOICE PROCESSING API ============
 @app.route('/api/process_voice', methods=['POST'])
 @login_required
@@ -917,4 +939,5 @@ if __name__ == "__main__":
     print(f"🚀 Starting SLCI Dashboard on http://{host}:{port}")
     print(f"📊 Features: Admin Panel • Employee Tasks • Reports • Charts • Export • Voice • Dark Mode")
     print(f"💬 WhatsApp: Full details + 👁️ Preview + 📥 Download links ✅")
+    print(f"🔗 Database: {'Internal URL' if os.getenv('USE_INTERNAL_DB') == 'true' else 'External URL + SSL'}")
     app.run(host=host, port=port, debug=debug)
