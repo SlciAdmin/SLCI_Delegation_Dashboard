@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Welcome - SLCI{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+    <i class="bi bi-broadcast" style="font-size: 4rem; color: white; margin-bottom: 1rem;"></i>
+    
+    <h1 style="color: white; font-size: 2.5rem; margin-bottom: 1rem;">
+        SLCI Delegation Dashboard
+    </h1>
+    
+    <p style="color: rgba(255,255,255,0.9); margin-bottom: 2rem; font-size: 1.2rem;">
+        Manage Tasks, Voice Commands & Reports - Professional Organization System
+    </p>
+    
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-box-arrow-in-right"></i> Login
+        </a>
+        <a href="{{ url_for('register') }}" class="btn btn-outline btn-lg" style="border-color: white; color: white;">
+            <i class="bi bi-person-plus"></i> Register
+        </a>
+    </div>
+    
+    <!-- Features -->
+    <div class="stats-grid" style="margin-top: 4rem; text-align: left;">
+        <div class="stats-card">
+            <i class="bi bi-people" style="font-size: 2rem; color: var(--primary); margin-bottom: 1rem;"></i>
+            <h3 style="margin-bottom: 0.5rem;">Role-Based Access</h3>
+            <p style="font-size: 0.9rem;">Separate Admin & Employee Dashboards</p>
+        </div>
+        <div class="stats-card">
+            <i class="bi bi-mic" style="font-size: 2rem; color: var(--success); margin-bottom: 1rem;"></i>
+            <h3 style="margin-bottom: 0.5rem;">Voice Commands</h3>
+            <p style="font-size: 0.9rem;">Create Tasks with Voice Input</p>
+        </div>
+        <div class="stats-card">
+            <i class="bi bi-graph-up" style="font-size: 2rem; color: var(--warning); margin-bottom: 1rem;"></i>
+            <h3 style="margin-bottom: 0.5rem;">Analytics</h3>
+            <p style="font-size: 0.9rem;">Real-time Reports & Charts</p>
+        </div>
+        <div class="stats-card">
+            <i class="bi bi-moon" style="font-size: 2rem; color: var(--dark); margin-bottom: 1rem;"></i>
+            <h3 style="margin-bottom: 0.5rem;">Dark Mode</h3>
+            <p style="font-size: 0.9rem;">Professional UI Themes</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

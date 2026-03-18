@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="nav-header">
+    <div class="nav-title">
+        <h1><i class="bi bi-graph-up"></i> Analytics & Reports</h1>
+        <p style="color: rgba(255,255,255,0.9);">Task Performance & Statistics</p>
+    </div>
+    <div class="nav-actions">
+        <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline" style="border-color: white; color: white;">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stats-card">
+        <h2 style="color: var(--primary);">{{ stats.total }}</h2>
+        <p>Total Tasks</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--warning);">{{ stats.pending }}</h2>
+        <p>Pending</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--success);">{{ stats.verified }}</h2>
+        <p>Verified</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--danger);">{{ stats.overdue }}</h2>
+        <p>Overdue</p>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-pie-chart"></i> Task Status Distribution
+        </div>
+        <div class="card-body">
+            <canvas id="statusChart" style="max-height: 300px;"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-bar-chart"></i> Employee Performance (On-Time)
+        </div>
+        <div class="card-body">
+            <canvas id="performanceChart" style="max-height: 300px;"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-funnel"></i> Filter Reports
+    </div>
+    <div class="card-body">
+        <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
+            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
+                <label class="form-label">Filter Employee</label>
+                <select class="form-control" name="employee">
+                    <option value="">All Employees</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.id }}" {% if filters.employee == emp.id|string %}selected{% endif %}>
+                        {{ emp.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
+                <label class="form-label">Filter Status</label>
+                <select class="form-control" name="status">
+                    <option value="">All Status</option>
+                    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="in_progress" {% if filters.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="submitted" {% if filters.status == 'submitted' %}selected{% endif %}>Submitted</option>
+                    <option value="verified" {% if filters.status == 'verified' %}selected{% endif %}>Verified</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
+                <label class="form-label">Date Range</label>
+                <select class="form-control" name="date_range">
+                    <option value="">All Time</option>
+                    <option value="today" {% if filters.date_range == 'today' %}selected{% endif %}>Today</option>
+                    <option value="overdue" {% if filters.date_range == 'overdue' %}selected{% endif %}>Overdue</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-bottom: 1.5rem;">
+                <i class="bi bi-search"></i> Apply Filter
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Task Table -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <i class="bi bi-table"></i> Detailed Task Log
+        <span style="font-size: 0.9rem; font-weight: 400;">({{ tasks|length }} tasks)</span>
+    </div>
+    <div class="card-body">
+        {% if tasks %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Task ID</th>
+                        <th>Title</th>
+                        <th>Employee</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Deadline</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td style="font-weight: 700; color: var(--primary);">{{ task.task_id }}</td>
+                        <td>{{ task.title[:50] }}{% if task.title|length > 50 %}...{% endif %}</td>
+                        <td>{{ task.employee.name if task.employee else 'N/A' }}</td>
+                        <td>
+                            <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+                        </td>
+                        <td>
+                            {% if task.priority == 'high' %}
+                            <span class="badge badge-high">High</span>
+                            {% elif task.priority == 'low' %}
+                            <span class="badge" style="background: rgba(100,116,139,0.2); color: var(--gray);">Low</span>
+                            {% else %}
+                            <span class="badge" style="background: rgba(99,102,241,0.2); color: var(--primary);">Medium</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.deadline %}
+                                {{ task.deadline.strftime('%Y-%m-%d') }}
+                                {% if task.deadline < now and task.status != 'verified' %}
+                                <span style="color: var(--danger); font-size: 0.75rem;">⚠️ Overdue</span>
+                                {% endif %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_task_detail', task_id=task.id) }}" class="btn btn-sm btn-outline">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+            <p>No tasks found matching your filters.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Initialize chartData with default fallback values
+var chartDataDefault = {
+    status: {
+        labels: ['No Data'],
+        data: [0],
+        colors: ['#64748b']
+    },
+    performance: {
+        labels: ['No Data'],
+        data: [0],
+        total: [0]
+    }
+};
+
+// Set default
+window.chartData = chartDataDefault;
+</script>
+
+{% if chart_data %}
+<script>
+// Load chart data from server
+window.chartData = JSON.parse('{{ chart_data|tojson }}');
+console.log('✅ Chart data loaded successfully');
+</script>
+{% endif %}
+
+<script>
+// Initialize Charts when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    const textColor = theme === 'dark' ? '#f1f5f9' : '#1e293b';
+    const gridColor = theme === 'dark' ? '#334155' : '#e2e8f0';
+    
+    // Status Chart (Doughnut)
+    const ctxStatus = document.getElementById('statusChart');
+    if (ctxStatus && window.chartData && window.chartData.status) {
+        new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: window.chartData.status.labels,
+                datasets: [{
+                    data: window.chartData.status.data,
+                    backgroundColor: window.chartData.status.colors || ['#6366f1', '#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { 
+                            color: textColor,
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                        titleColor: textColor,
+                        bodyColor: textColor,
+                        borderColor: gridColor,
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+    
+    // Performance Chart (Bar)
+    const ctxPerformance = document.getElementById('performanceChart');
+    if (ctxPerformance && window.chartData && window.chartData.performance) {
+        new Chart(ctxPerformance, {
+            type: 'bar',
+            data: {
+                labels: window.chartData.performance.labels,
+                datasets: [{
+                    label: 'On-Time Tasks',
+                    data: window.chartData.performance.data,
+                    backgroundColor: '#6366f1',
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: textColor },
+                        grid: { color: gridColor }
+                    },
+                    x: {
+                        ticks: { 
+                            color: textColor,
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: textColor }
+                    },
+                    tooltip: {
+                        backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                        titleColor: textColor,
+                        bodyColor: textColor,
+                        borderColor: gridColor,
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

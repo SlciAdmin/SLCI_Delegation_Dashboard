@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Task Detail{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 1000px; margin: 2rem auto;">
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between;">
+            <span style="font-size: 1.2rem;">{{ task.task_id }}</span>
+            <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+        </div>
+        <div class="card-body">
+            <h2 style="margin-bottom: 1.5rem;">{{ task.title }}</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; background: var(--light); padding: 1.5rem; border-radius: 16px;">
+                <div><strong>Employee:</strong> {{ task.employee.name if task.employee else 'N/A' }}</div>
+                <div><strong>Deadline:</strong> {{ task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else 'N/A' }}</div>
+                <div><strong>Priority:</strong> {{ task.priority }}</div>
+                <div><strong>Created:</strong> {{ task.created_at.strftime('%Y-%m-%d') }}</div>
+                {% if task.creator %}
+                <div><strong>Created By:</strong> {{ task.creator.name }}</div>
+                {% endif %}
+                {% if task.employee and task.employee.phone %}
+                <div><strong>Employee Phone:</strong> <i class="bi bi-whatsapp"></i> {{ task.employee.phone }}</div>
+                {% endif %}
+                {% if task.creator and task.creator.phone %}
+                <div><strong>Admin Phone:</strong> <i class="bi bi-whatsapp"></i> {{ task.creator.phone }}</div>
+                {% endif %}
+            </div>
+            
+            <p style="background: var(--light); padding: 1.5rem; border-radius: 12px; line-height: 1.6;">
+                {{ task.description or 'No description' }}
+            </p>
+            
+            {% if task.admin_attachment %}
+            <div style="margin-top: 1rem;">
+                <strong>📎 Admin Attachment:</strong> {{ task.admin_attachment.split('/')[-1] }}
+                <a href="{{ url_for('download_file', filename=task.admin_attachment) }}" class="btn btn-sm btn-outline" style="margin-left: 1rem;">
+                    <i class="bi bi-download"></i> Download
+                </a>
+            </div>
+            {% endif %}
+            
+            {% if documents %}
+            <div style="margin-top: 1.5rem;">
+                <h4 style="margin-bottom: 1rem;">📁 All Attachments</h4>
+                {% for doc in documents %}
+                <div style="padding: 0.75rem; background: var(--light); border-radius: 8px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="bi bi-file-earmark"></i> {{ doc.original_filename }}</span>
+                    <a href="{{ url_for('download_file', filename=doc.filename) }}" class="btn btn-sm btn-outline">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Employee Submission -->
+    {% if user_role == 'employee' and task.status in ['pending', 'in_progress'] %}
+    <div class="card" style="margin-top: 1.5rem; border: 2px solid var(--primary);">
+        <div class="card-header">Submit Work</div>
+        <div class="card-body">
+            <form id="submitTaskForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label class="form-label">Upload Work File *</label>
+                    <input type="file" name="employee_attachment" class="form-control" style="margin-bottom: 1rem;" required>
+                    <small style="color: var(--gray);">This file will be included in WhatsApp notification to Admin</small>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">
+                    <i class="bi bi-upload"></i> Submit for Verification
+                </button>
+            </form>
+            
+            <!-- ✅ WhatsApp Notify Button (AFTER submission) -->
+            {% if task.creator and task.creator.phone and task.whatsapp_submission_link %}
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--gray-light); text-align: center;">
+                <small style="display: block; margin-bottom: 0.5rem; color: var(--gray);">
+                    📱 After submitting, notify Admin with full details including attachments:
+                </small>
+                <a href="{{ task.whatsapp_submission_link }}"
+                   target="_blank"
+                   class="btn btn-sm btn-whatsapp">
+                    <i class="bi bi-whatsapp"></i> Notify Admin via WhatsApp (With Attachment Info)
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Admin Verification -->
+    {% if user_role == 'admin' and task.status == 'submitted' %}
+    <div class="card" style="margin-top: 1.5rem; border: 2px solid var(--success);">
+        <div class="card-header">Verify Task</div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('verify_task', task_id=task.id) }}">
+                <div class="form-group">
+                    <label class="form-label">Verification Notes</label>
+                    <textarea name="verification_notes" class="form-control" rows="3" placeholder="Add notes..."></textarea>
+                </div>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <button type="submit" name="action" value="approve" class="btn btn-success" style="flex:1;">
+                        <i class="bi bi-check-circle"></i> Approve
+                    </button>
+                    <button type="submit" name="action" value="reject" class="btn btn-danger" style="flex:1;">
+                        <i class="bi bi-x-circle"></i> Reject
+                    </button>
+                </div>
+            </form>
+            
+            <!-- ✅ WhatsApp Notify Button (AFTER verification) -->
+            {% if task.employee and task.employee.phone and task.whatsapp_verification_link %}
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--gray-light); text-align: center;">
+                <small style="display: block; margin-bottom: 0.5rem; color: var(--gray);">
+                    📱 Notify Employee about decision with full details including attachments:
+                </small>
+                <a href="{{ task.whatsapp_verification_link }}"
+                   target="_blank"
+                   class="btn btn-sm btn-whatsapp">
+                    <i class="bi bi-whatsapp"></i> Notify Employee via WhatsApp (With Attachment Info)
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ✅ Deadline Reminder WhatsApp Section -->
+    {% if task.whatsapp_reminder_3hr or task.whatsapp_reminder_1hr %}
+    <div class="card" style="margin-top: 1.5rem; border-left: 4px solid var(--warning);">
+        <div class="card-header" style="background: linear-gradient(135deg, var(--warning), #f97316);">
+            <i class="bi bi-clock"></i> Deadline Reminders
+        </div>
+        <div class="card-body">
+            {% if task.whatsapp_reminder_3hr %}
+            <a href="{{ task.whatsapp_reminder_3hr }}" target="_blank" class="btn btn-sm btn-whatsapp" style="margin-right: 0.5rem;">
+                <i class="bi bi-whatsapp"></i> Send 3-Hour Reminder
+            </a>
+            {% endif %}
+            {% if task.whatsapp_reminder_1hr %}
+            <a href="{{ task.whatsapp_reminder_1hr }}" target="_blank" class="btn btn-sm btn-whatsapp">
+                <i class="bi bi-whatsapp"></i> Send 1-Hour URGENT Reminder
+            </a>
+            {% endif %}
+            <p style="font-size: 0.8rem; color: var(--gray); margin-top: 0.5rem;">
+                <i class="bi bi-info-circle"></i> Click to send deadline reminder via WhatsApp
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Task Status History -->
+    {% if task.status_history %}
+    <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">Status History</div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                {% for status in task.status_history %}
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: var(--light); border-radius: 8px;">
+                    <span><span class="badge badge-{{ status.status }}">{{ status.status }}</span></span>
+                    <span style="color: var(--gray);">{{ status.changed_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Back Button & Quick WhatsApp Contact -->
+    <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="{{ url_for('admin_dashboard') if user_role == 'admin' else url_for('employee_dashboard') }}" class="btn btn-outline">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+        
+        <!-- Quick WhatsApp Contact Buttons -->
+        {% if user_role == 'admin' and task.employee and task.employee.phone %}
+        <a href="{{ generate_whatsapp_link(task.employee.phone, 'Regarding task: ' + task.task_id + ' - ' + task.title) }}"
+           target="_blank"
+           class="btn btn-whatsapp">
+            <i class="bi bi-whatsapp"></i> Chat with Employee
+        </a>
+        {% endif %}
+        
+        {% if user_role == 'employee' and task.creator and task.creator.phone %}
+        <a href="{{ generate_whatsapp_link(task.creator.phone, 'Regarding task: ' + task.task_id + ' - ' + task.title) }}"
+           target="_blank"
+           class="btn btn-whatsapp">
+            <i class="bi bi-whatsapp"></i> Chat with Admin
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if user_role == 'employee' %}
+<script>
+document.getElementById('submitTaskForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
+    submitBtn.disabled = true;
+    
+    try {
+        const res = await fetch('/employee/submit_task/{{ task.id }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if(data.success) {
+            alert('✅ ' + data.message);
+            location.reload();  // Reload to show WhatsApp button
+        } else {
+            alert('❌ ' + data.error);
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    } catch(error) {
+        alert('❌ Error submitting task');
+        console.error('Error:', error);
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
+</script>
+{% endif %}
+
+<!-- ✅ WhatsApp Button CSS Styles -->
+<style>
+.btn-whatsapp {
+    background-color: #25D366;
+    border-color: #25D366;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 14px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+.btn-whatsapp:hover {
+    background-color: #128C7E;
+    border-color: #128C7E;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+    text-decoration: none;
+}
+.btn-sm.btn-whatsapp {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+}
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+.badge {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.85rem;
+}
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    .card-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    div[style*="display: grid; grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+    .btn {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .btn-whatsapp {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}

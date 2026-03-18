@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<!-- Header -->
+<div class="nav-header">
+    <div class="nav-title">
+        <h1>👑 Admin Dashboard</h1>
+        <p>Welcome, {{ current_user.name }}</p>
+    </div>
+    <div class="nav-actions">
+        <a href="{{ url_for('create_task') }}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Create Task
+        </a>
+        <a href="{{ url_for('reports') }}" class="btn btn-outline" style="border-color: white; color: white;">
+            <i class="bi bi-graph-up"></i> Reports
+        </a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stats-card">
+        <h2 style="color: var(--primary);">{{ stats.total }}</h2>
+        <p>Total Tasks</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--warning);">{{ stats.pending }}</h2>
+        <p>Pending</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--success);">{{ stats.verified }}</h2>
+        <p>Verified</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--danger);">{{ stats.overdue }}</h2>
+        <p>Overdue</p>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="cards-grid">
+    <!-- Task List -->
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-list-check"></i> All Tasks
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                <select class="form-control" style="width: auto;" onchange="filterTasks()" id="filterStatus">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="verified">Verified</option>
+                </select>
+                <input type="text" class="form-control" style="width: auto;" placeholder="Search tasks..." onkeyup="searchTasks(this)">
+            </div>
+            
+            {% if tasks %}
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                {% for task in tasks %}
+                <div class="task-item status-{{ task.status }} {% if task.deadline and task.deadline < now and task.status != 'verified' %}overdue{% endif %}">
+                    <div class="task-info">
+                        <div class="task-title" style="font-weight: 700;">
+                            {{ task.task_id }}: {{ task.title }}
+                        </div>
+                        <div class="task-meta" style="font-size: 0.85rem; color: var(--gray);">
+                            <i class="bi bi-person"></i> {{ task.employee.name if task.employee else 'N/A' }} |
+                            <i class="bi bi-calendar"></i> {{ task.deadline.strftime('%b %d') if task.deadline else 'No Date' }}
+                            {% if task.employee and task.employee.phone %}
+                            | <i class="bi bi-phone"></i> {{ task.employee.phone }}
+                            {% endif %}
+                            {% if task.admin_attachment %}
+                            | <i class="bi bi-paperclip"></i> {{ task.admin_attachment.split('/')[-1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="task-actions" style="display: flex; align-items: center; gap: 5px;">
+                        <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+                        <a href="{{ url_for('admin_task_detail', task_id=task.id) }}" class="btn btn-sm btn-outline">
+                            View
+                        </a>
+                        {% if task.employee and task.employee.phone %}
+                        <a href="{{ task.whatsapp_notify_link or generate_whatsapp_link(task.employee.phone, '📋 Task ' + task.task_id + ': ' + task.title + ' Deadline: ' + (task.deadline.strftime('%b %d') if task.deadline else 'N/A') + ' Check dashboard for details.') }}"
+                           target="_blank"
+                           class="btn btn-sm btn-whatsapp"
+                           title="Send Task Details via WhatsApp">
+                            <i class="bi bi-whatsapp"></i> Notify
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>No tasks found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Employee Management -->
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-people"></i> Employees
+        </div>
+        <div class="card-body">
+            {% for emp in employees %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--gray-light);"
+                 data-employee-id="{{ emp.id }}"
+                 data-employee-name="{{ emp.name | e }}"
+                 data-delete-url="{{ url_for('delete_employee', user_id=emp.id) }}">
+                <div>
+                    <div style="font-weight: 600;">{{ emp.name }}</div>
+                    <div style="font-size: 0.8rem; color: var(--gray);">{{ emp.designation }}</div>
+                    <div style="font-size: 0.75rem; color: var(--primary);">
+                        <i class="bi bi-phone"></i> {{ emp.phone or 'No Phone' }}
+                    </div>
+                </div>
+                <button onclick="handleDeleteClick(this)" class="btn btn-sm btn-danger" type="button">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            {% endfor %}
+            {% if not employees %}
+            <div class="empty-state">
+                <p>No employees found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Button CSS Styles -->
+<style>
+.btn-whatsapp {
+    background-color: #25D366;
+    border-color: #25D366;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 14px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+.btn-whatsapp:hover {
+    background-color: #128C7E;
+    border-color: #128C7E;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+    color: white;
+    text-decoration: none;
+}
+.btn-sm.btn-whatsapp {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+.task-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.phone-display {
+    font-size: 0.75rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+@media (max-width: 768px) {
+    .task-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .task-actions {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .btn-sm {
+        width: auto;
+    }
+}
+</style>
+
+<!-- JavaScript Functions -->
+<script>
+function filterTasks() {
+    const status = document.getElementById('filterStatus').value;
+    const tasks = document.querySelectorAll('.task-item');
+    tasks.forEach(task => {
+        if (status === 'all') {
+            task.style.display = 'flex';
+        } else {
+            const taskStatus = task.classList.contains('status-' + status);
+            task.style.display = taskStatus ? 'flex' : 'none';
+        }
+    });
+}
+
+function searchTasks(input) {
+    const searchTerm = input.value.toLowerCase();
+    const tasks = document.querySelectorAll('.task-item');
+    tasks.forEach(task => {
+        const taskTitle = task.querySelector('.task-title').textContent.toLowerCase();
+        const taskMeta = task.querySelector('.task-meta').textContent.toLowerCase();
+        if (taskTitle.includes(searchTerm) || taskMeta.includes(searchTerm)) {
+            task.style.display = 'flex';
+        } else {
+            task.style.display = 'none';
+        }
+    });
+}
+
+function handleDeleteClick(button) {
+    const employeeDiv = button.closest('div[data-employee-id]');
+    const employeeId = employeeDiv.dataset.employeeId;
+    const employeeName = employeeDiv.dataset.employeeName;
+    const deleteUrl = employeeDiv.dataset.deleteUrl;
+    
+    if (confirm(`⚠️ Are you sure you want to delete employee "${employeeName}"? This action cannot be undone.`)) {
+        window.location.href = deleteUrl;
+    }
+}
+
+function copyPhone(phone) {
+    navigator.clipboard.writeText(phone).then(() => {
+        alert('📱 Phone number copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
+</script>
+{% endblock %}

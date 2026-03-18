@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Employee Dashboard{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="nav-header">
+    <div class="nav-title">
+        <h1>📋 My Tasks</h1>
+        <p>Welcome, {{ current_user.name }}</p>
+    </div>
+    <div class="nav-actions">
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stats-card">
+        <h2 style="color: var(--primary);">{{ stats.total }}</h2>
+        <p>Total Tasks</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--warning);">{{ stats.pending }}</h2>
+        <p>Pending</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--secondary);">{{ stats.submitted }}</h2>
+        <p>Submitted</p>
+    </div>
+    <div class="stats-card">
+        <h2 style="color: var(--success);">{{ stats.verified }}</h2>
+        <p>Completed</p>
+    </div>
+</div>
+
+<!-- Task List -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list-check"></i> My Assigned Tasks
+    </div>
+    <div class="card-body">
+        <div style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <select class="form-control" style="width: auto;" onchange="filterTasks()" id="filterStatus">
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="submitted">Submitted</option>
+                <option value="verified">Verified</option>
+            </select>
+            <input type="text" class="form-control" style="width: auto;" placeholder="Search tasks..." onkeyup="searchTasks(this)">
+        </div>
+        
+        {% if tasks %}
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            {% for task in tasks %}
+            <div class="task-item status-{{ task.status }} {% if task.deadline and task.deadline < now and task.status != 'verified' %}overdue{% endif %}">
+                <div class="task-info">
+                    <div class="task-title" style="font-weight: 700;">
+                        {{ task.task_id }}: {{ task.title }}
+                    </div>
+                    <div class="task-meta" style="font-size: 0.85rem; color: var(--gray);">
+                        <i class="bi bi-calendar"></i> {{ task.deadline.strftime('%b %d, %Y %H:%M') if task.deadline else 'No Date' }}
+                        {% if task.priority == 'high' %}
+                        <span class="badge badge-high" style="margin-left: 0.5rem;">High Priority</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+                    <a href="{{ url_for('employee_task_detail', task_id=task.id) }}" class="btn btn-sm btn-outline" style="margin-left: 5px;">
+                        View
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>No tasks assigned yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
