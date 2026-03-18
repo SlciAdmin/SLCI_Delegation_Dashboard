@@ -4,10 +4,17 @@ set -e
 echo "🔧 Starting build..."
 echo "🐍 Python version: $(python --version)"
 
-# Upgrade pip
+# Upgrade pip FIRST
 python -m pip install --upgrade pip
 
-# Install ffmpeg for whisper (ignore errors if read-only)
+# Install build tools BEFORE requirements (critical for whisper!)
+echo "🔨 Installing build dependencies..."
+pip install --prefer-binary --no-cache-dir \
+    setuptools>=68.0.0 \
+    wheel>=0.42.0 \
+    pkginfo>=1.10.0
+
+# Install ffmpeg for whisper (ignore read-only filesystem errors)
 echo "📦 Installing system packages..."
 apt-get update -qq 2>/dev/null || true
 apt-get install -y -qq ffmpeg 2>/dev/null || echo "⚠️ ffmpeg install skipped"
@@ -15,12 +22,12 @@ apt-get install -y -qq ffmpeg 2>/dev/null || echo "⚠️ ffmpeg install skipped
 # Install Python deps: FORCE BINARY WHEELS
 echo "📦 Installing Python dependencies..."
 pip install --prefer-binary --no-cache-dir -r requirements.txt || {
-    echo "❌ Binary install failed. Checking Python version..."
+    echo "❌ Install failed. Checking Python version..."
     python --version
     exit 1
 }
 
-# Pre-download whisper model (tiny for faster build)
+# Pre-download whisper model (use tiny for faster build)
 echo "⬇️ Pre-downloading whisper model: ${WHISPER_MODEL:-tiny}"
 python -c "
 import os, whisper, sys

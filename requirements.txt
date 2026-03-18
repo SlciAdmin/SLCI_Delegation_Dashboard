@@ -7,7 +7,7 @@ gunicorn==21.2.0
 
 # Utilities
 python-dotenv==1.0.0
-psycopg2-binary==2.9.11  # ← Updated: 2.9.9 → 2.9.11 (latest)
+psycopg2-binary==2.9.11
 
 # Data & Excel
 pandas==2.2.2
@@ -16,4 +16,11 @@ numpy==1.26.4
 
 # Audio/Whisper
 pydub==0.25.1
-openai-whisper==20231117
+
+# Whisper: Use git version for better build compatibility
+# OR use newer release if available
+openai-whisper @ git+https://github.com/openai/whisper.git@v20231117
+
+# Build dependencies (ensure available during wheel build)
+setuptools>=68.0.0
+wheel>=0.42.0
