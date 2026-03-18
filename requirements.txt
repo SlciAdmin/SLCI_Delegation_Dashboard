@@ -9,13 +9,15 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 psycopg2-binary==2.9.9
 
-# Data & Excel
+# Data & Excel (wheels available for py3.11)
 pandas==2.2.2
 openpyxl==3.1.2
+numpy==1.26.4
 
-# Audio/Whisper (heavy deps)
+# Audio/Whisper
 pydub==0.25.1
 openai-whisper==20231117
 
-# Optional: Pin numpy to avoid conflicts
-numpy==1.26.4
+# Whisper dependencies (pin for compatibility)
+torch==2.2.0; python_version < "3.12"
+torchaudio==2.2.0; python_version < "3.12"
