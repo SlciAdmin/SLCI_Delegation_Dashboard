@@ -1,30 +1,37 @@
 #!/bin/bash
 set -e
 
-echo "🔧 Starting build for Python 3.11..."
+echo "🔧 Starting build..."
+echo "🐍 Python version: $(python --version)"
 
-# Upgrade pip first
+# Upgrade pip
 python -m pip install --upgrade pip
 
-# Install system dependencies (ffmpeg for whisper)
+# Install ffmpeg for whisper (ignore errors if read-only)
 echo "📦 Installing system packages..."
-apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null 2>&1 || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y -qq ffmpeg 2>/dev/null || echo "⚠️ ffmpeg install skipped"
 
-# Install Python deps: FORCE BINARY WHEELS (critical!)
+# Install Python deps: FORCE BINARY WHEELS
 echo "📦 Installing Python dependencies..."
-pip install --prefer-binary --only-binary=:all: -r requirements.txt || {
-    echo "⚠️ Binary install failed, trying fallback..."
-    pip install --prefer-binary -r requirements.txt
+pip install --prefer-binary --no-cache-dir -r requirements.txt || {
+    echo "❌ Binary install failed. Checking Python version..."
+    python --version
+    exit 1
 }
 
-# Pre-download whisper model (optional but recommended)
-echo "⬇️ Pre-downloading whisper model: ${WHISPER_MODEL:-base}"
+# Pre-download whisper model (tiny for faster build)
+echo "⬇️ Pre-downloading whisper model: ${WHISPER_MODEL:-tiny}"
 python -c "
-import os, whisper
-model = os.getenv('WHISPER_MODEL', 'base')
+import os, whisper, sys
+model = os.getenv('WHISPER_MODEL', 'tiny')
 print(f'Loading whisper {model}...')
-whisper.load_model(model)
-print('✅ Model ready')
-" 2>/dev/null || echo "⚠️ Whisper model will download at runtime"
+try:
+    whisper.load_model(model)
+    print('✅ Model downloaded')
+except Exception as e:
+    print(f'⚠️ Model download failed: {e}')
+    sys.exit(0)  # Don't fail build
+" 2>&1 || true
 
 echo "✅ Build completed successfully!"
