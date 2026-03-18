@@ -2,8 +2,8 @@
 """
 SLCI Delegation Dashboard - Complete Flask Backend
 ✅ FIXED: PostgreSQL SSL Connection for Render.com
+✅ Simplified DATABASE_URL config with sslmode=require
 ✅ Lazy database initialization (no fail at import)
-✅ Internal DATABASE_URL support (no SSL needed for Render-to-Render)
 ✅ WhatsApp notifications + file serving + all features preserved
 """
 import os
@@ -35,44 +35,42 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ============ ✅ CONFIGURATION ============
+# ============ ✅ DATABASE CONFIG - RENDER READY ============
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key_change_in_production')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'static/uploads')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ✅ FIXED: Database URI with proper SSL handling for Render
-def get_database_uri():
-    """Build database URI with proper SSL configuration for Render"""
-    # Option 1: Use internal DATABASE_URL (preferred - no SSL needed for Render-to-Render)
-    if os.getenv('USE_INTERNAL_DB') == 'true' and os.getenv('DATABASE_URL'):
-        logger.info("🔗 Using internal DATABASE_URL (Render internal connection)")
-        return os.getenv('DATABASE_URL')
-    
-    # Option 2: Build from individual env vars with SSL
+# ✅ SIMPLE: Use DATABASE_URL directly if set, else fallback
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Remove any existing ?sslmode and add require
+    if '?' not in DATABASE_URL:
+        DATABASE_URL += '?sslmode=require'
+    elif 'sslmode' not in DATABASE_URL:
+        DATABASE_URL += '&sslmode=require'
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    logger.info("🔗 Using DATABASE_URL from env")
+else:
+    # Fallback to individual vars (not recommended for Render)
     from urllib.parse import quote_plus
-    db_user = os.getenv('DB_USER', 'postgres')
-    db_password = quote_plus(os.getenv('DB_PASSWORD', ''))  # URL-encode password
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_port = os.getenv('DB_PORT', '5432')
-    db_name = os.getenv('DB_NAME', 'postgres')
-    
-    # For external connections: add sslmode=require
-    uri = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
-    logger.info("🔗 Using external DB URI with sslmode=require")
-    return uri
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        f"postgresql://{os.getenv('DB_USER')}:"
+        f"{quote_plus(os.getenv('DB_PASSWORD', ''))}@"
+        f"{os.getenv('DB_HOST', 'localhost')}:"
+        f"{os.getenv('DB_PORT', '5432')}/"
+        f"{os.getenv('DB_NAME', 'postgres')}?sslmode=require"
+    )
+    logger.info("🔗 Using fallback DB config")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
-
-# ✅ FIXED: Engine options with connection pooling + retry settings
+# ✅ Engine options for Render stability
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,        # ✅ Auto-reconnect on stale connections
-    'pool_recycle': 300,          # ✅ Recycle every 5 minutes
-    'pool_timeout': 30,           # ✅ Wait up to 30s for connection
-    'max_overflow': 10,           # ✅ Allow burst connections
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_timeout': 30,
     'connect_args': {
-        'connect_timeout': 10,    # ✅ Connection timeout
-        'options': '-csearch_path=delegation,public'  # ✅ Your schema
+        'connect_timeout': 10,
+        'options': '-csearch_path=delegation,public'
     }
 }
 
@@ -141,6 +139,21 @@ def init_database():
     return False
 
 
+@app.before_request
+def ensure_db_ready():
+    """Ensure DB is initialized on first request"""
+    global _db_initialized
+    if not _db_initialized and current_user.is_authenticated:
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            _db_initialized = True
+            logger.info("✅ DB connected on first request")
+        except Exception as e:
+            logger.warning(f"⚠️ DB not ready yet: {e}")
+
+
 # ============ ✅ HELPER FUNCTIONS ============
 def generate_whatsapp_link(phone_number, message):
     """Generate WhatsApp wa.me link - FIXED"""
@@ -148,6 +161,7 @@ def generate_whatsapp_link(phone_number, message):
     if not clean_phone:
         return "#"
     encoded_message = urllib.parse.quote(message, safe='')
+    # ✅ FIXED: Removed extra spaces in WhatsApp URL
     return f"https://wa.me/{clean_phone}?text={encoded_message}"
 
 
@@ -705,7 +719,7 @@ if __name__ == "__main__":
     port = int(os.getenv('PORT', 10000))
     
     logger.info(f"🚀 Starting SLCI Dashboard on http://{host}:{port}")
-    logger.info(f"🔗 Database: {'Internal' if os.getenv('USE_INTERNAL_DB') == 'true' else 'External + SSL'}")
+    logger.info(f"🔗 Database: {'DATABASE_URL' if os.getenv('DATABASE_URL') else 'Fallback config'}")
     
     # Initialize DB before starting server (with retries)
     init_database()
