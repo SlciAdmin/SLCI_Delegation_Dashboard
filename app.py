@@ -688,7 +688,7 @@ def internal_error(error):
 
 # ============ MODELS ============
 
-class User(db.Model):
+class User(UserMixin, db.Model):  # 👈 UserMixin add kiya
     __tablename__ = 'users'
     __table_args__ = {"schema": "delegation"}
     id = db.Column(db.Integer, primary_key=True)
