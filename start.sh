@@ -1,13 +1,7 @@
 #!/bin/bash
+set -e
 
-# Load .env for local dev (Render injects env vars automatically)
-if [ -f .env ] && [ "$FLASK_ENV" != "production" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
-
-# Use Render's PORT or default
 PORT=${PORT:-10000}
-
 echo "🚀 Starting Flask app on port $PORT"
 
 # Production server with gunicorn

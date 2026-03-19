@@ -1,22 +1,11 @@
-# Core Flask
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.2
 Werkzeug==2.3.7
 gunicorn==21.2.0
-
-# Utilities
 python-dotenv==1.0.0
 psycopg2-binary==2.9.11
-
-# Data & Excel
 pandas==2.2.2
 openpyxl==3.1.2
 numpy==1.26.4
-
-# Audio
 pydub==0.25.1
-psycopg2-binary==2.9.11
-
-# ⚠️ REMOVE or COMMENT OUT whisper from here:
-# openai-whisper==20231117
