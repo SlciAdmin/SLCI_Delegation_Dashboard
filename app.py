@@ -789,10 +789,16 @@ class TaskDocument(db.Model):
     uploader = db.relationship('User', backref='uploaded_documents')
 
 # ============ MAIN ============
+# ============ MAIN ENTRY POINT - FIXED ============
 if __name__ == "__main__":
     debug = os.getenv('FLASK_DEBUG', '0') == '1'
     host = '0.0.0.0'
     port = int(os.getenv('PORT', 10000))
+    
     logger.info(f"🚀 Starting SLCI Dashboard on http://{host}:{port}")
-    init_database()
+    
+    # ✅ DO NOT call init_database() here!
+    # Let gunicorn start HTTP server FIRST
+    # DB will connect lazily via ensure_db_ready()
+    
     app.run(host=host, port=port, debug=debug)
