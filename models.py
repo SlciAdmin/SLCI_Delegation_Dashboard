@@ -27,15 +27,18 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password, password)
     
     def get_stats(self):
-        tasks = self.assigned_tasks.all()
-        return {
-            'total': len(tasks),
-            'pending': len([t for t in tasks if t.status == 'pending']),
-            'in_progress': len([t for t in tasks if t.status == 'in_progress']),
-            'submitted': len([t for t in tasks if t.status == 'submitted']),
-            'verified': len([t for t in tasks if t.status == 'verified']),
-            'overdue': len([t for t in tasks if t.deadline and t.deadline < datetime.utcnow() and t.status != 'verified'])
-        }
+        try:
+            tasks = self.assigned_tasks.all()
+            return {
+                'total': len(tasks),
+                'pending': len([t for t in tasks if t.status == 'pending']),
+                'in_progress': len([t for t in tasks if t.status == 'in_progress']),
+                'submitted': len([t for t in tasks if t.status == 'submitted']),
+                'verified': len([t for t in tasks if t.status == 'verified']),
+                'overdue': len([t for t in tasks if t.deadline and t.deadline < datetime.utcnow() and t.status != 'verified'])
+            }
+        except:
+            return {}
 
 class Task(db.Model):
     __tablename__ = 'tasks'
