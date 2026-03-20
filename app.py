@@ -640,12 +640,31 @@ def reports():
 def export_excel():
     if current_user.role != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
-    
     try:
         import pandas as pd
         from io import BytesIO
         
-        tasks = Task.query.all()
+        # ✅ NEW: Get Filter Parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        emp_id = request.args.get('employee_id')
+        
+        query = Task.query
+        
+        # ✅ Filter by Employee
+        if emp_id and emp_id != 'all':
+            query = query.filter_by(employee_id=int(emp_id))
+            
+        # ✅ Filter by Date Range (Created At)
+        if start_date:
+            query = query.filter(Task.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
+        if end_date:
+            # Add 1 day to include the end date fully
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Task.created_at < end_dt)
+            
+        tasks = query.all()
+        
         data = [{
             'Task ID': t.task_id,
             'Title': t.title,
@@ -653,7 +672,8 @@ def export_excel():
             'Status': t.status,
             'Priority': t.priority,
             'Deadline': t.deadline.strftime('%Y-%m-%d') if t.deadline else '',
-            'Created': t.created_at.strftime('%Y-%m-%d') if t.created_at else ''
+            'Created': t.created_at.strftime('%Y-%m-%d') if t.created_at else '',
+            'Submission Notes': t.submission_notes or '-'  # ✅ Include Notes in Excel
         } for t in tasks]
         
         df = pd.DataFrame(data)
@@ -666,6 +686,7 @@ def export_excel():
         response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         response.headers['Content-Disposition'] = f'attachment; filename=SLCI_Report_{datetime.now().strftime("%Y%m%d")}.xlsx'
         return response
+        
     except ImportError:
         return jsonify({'error': 'pandas/openpyxl not installed'}), 500
     except Exception as e:
@@ -724,7 +745,11 @@ def submit_task(task_id):
         if task.status in ['submitted', 'verified']:
             return jsonify({'success': False, 'error': 'Already submitted'}), 400
         
+        # ✅ NEW: Get Submission Notes
+        submission_notes = request.form.get('submission_notes', '').strip()
+        
         employee_attachment = None
+        # ✅ UPDATED: Handle Optional File
         if 'employee_attachment' in request.files:
             file = request.files['employee_attachment']
             if file and file.filename:
@@ -733,6 +758,7 @@ def submit_task(task_id):
                 file.save(filepath)
                 employee_attachment = f'employee_files/{filename}'
                 
+                # Save document record
                 doc = TaskDocument(
                     task_id=task.id, uploaded_by=current_user.id, filename=filename,
                     original_filename=file.filename, file_type=file.content_type,
@@ -740,19 +766,26 @@ def submit_task(task_id):
                 )
                 db.session.add(doc)
         
+        # Update Task
         task.status = 'submitted'
         task.completed_at = datetime.utcnow()
         task.employee_attachment = employee_attachment
+        task.submission_notes = submission_notes  # ✅ Save Notes
+        
         db.session.commit()
         
-        # Notify admin via WhatsApp if available
+        # ✅ UPDATED: WhatsApp Message with Notes
         if task.creator and task.creator.phone:
-            msg = f"✅ Task Submitted: {task.title}\nID: {task.task_id}"
+            note_text = f"\n📝 Note: {submission_notes}" if submission_notes else ""
+            attach_text = "\n📎 Attachment Included" if employee_attachment else "\n📎 No Attachment"
+            
+            msg = f"✅ Task Submitted: {task.title}\nID: {task.task_id}{note_text}{attach_text}"
             task.whatsapp_submission_link = generate_whatsapp_link(task.creator.phone, msg)
             db.session.commit()
-        
+            
         send_notification(task.created_by, f"✅ Task Submitted: {task.title}", task.id, 'success')
         return jsonify({'success': True, 'message': 'Task submitted successfully!'})
+        
     except Exception as e:
         db.session.rollback()
         logger.error(f"Submit error: {e}")

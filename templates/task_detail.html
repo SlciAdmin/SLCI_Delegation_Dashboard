@@ -56,37 +56,46 @@
     </div>
     
     <!-- Employee Submission -->
-    {% if user_role == 'employee' and task.status in ['pending', 'in_progress'] %}
-    <div class="card" style="margin-top: 1.5rem; border: 2px solid var(--primary);">
-        <div class="card-header">Submit Work</div>
-        <div class="card-body">
-            <form id="submitTaskForm" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label class="form-label">Upload Work File *</label>
-                    <input type="file" name="employee_attachment" class="form-control" style="margin-bottom: 1rem;" required>
-                    <small style="color: var(--gray);">This file will be included in WhatsApp notification to Admin</small>
-                </div>
-                <button type="submit" class="btn btn-success" style="width: 100%;">
-                    <i class="bi bi-upload"></i> Submit for Verification
-                </button>
-            </form>
-            
-            <!-- ✅ WhatsApp Notify Button (AFTER submission) -->
-            {% if task.creator and task.creator.phone and task.whatsapp_submission_link %}
-            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--gray-light); text-align: center;">
-                <small style="display: block; margin-bottom: 0.5rem; color: var(--gray);">
-                    📱 After submitting, notify Admin with full details including attachments:
-                </small>
-                <a href="{{ task.whatsapp_submission_link }}"
-                   target="_blank"
-                   class="btn btn-sm btn-whatsapp">
-                    <i class="bi bi-whatsapp"></i> Notify Admin via WhatsApp (With Attachment Info)
-                </a>
+    <!-- Employee Submission -->
+{% if user_role == 'employee' and task.status in ['pending', 'in_progress'] %}
+<div class="card" style="margin-top: 1.5rem; border: 2px solid var(--primary);">
+    <div class="card-header">Submit Work</div>
+    <div class="card-body">
+        <form id="submitTaskForm" enctype="multipart/form-data">
+            <!-- ✅ NEW: Submission Message -->
+            <div class="form-group">
+                <label class="form-label">Submission Message / Notes *</label>
+                <textarea name="submission_notes" class="form-control" rows="3" 
+                          placeholder="Admin ke liye message likhein (e.g., Task completed, check attachment)" required></textarea>
+                <small style="color: var(--gray);">Ye message admin ko WhatsApp aur Dashboard par dikhega.</small>
             </div>
-            {% endif %}
+
+            <!-- ✅ UPDATED: Attachment Optional (required hata diya) -->
+            <div class="form-group">
+                <label class="form-label">Upload Work File (Optional)</label>
+                <input type="file" name="employee_attachment" class="form-control" style="margin-bottom: 1rem;">
+                <small style="color: var(--gray);">Agar file nahi hai toh khali chhod dein.</small>
+            </div>
+
+            <button type="submit" class="btn btn-success" style="width: 100%;">
+                <i class="bi bi-upload"></i> Submit for Verification
+            </button>
+        </form>
+
+        <!-- WhatsApp Notify Button (After submission) -->
+        {% if task.creator and task.creator.phone and task.whatsapp_submission_link %}
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--gray-light); text-align: center;">
+            <small style="display: block; margin-bottom: 0.5rem; color: var(--gray);">
+                📱 After Submit Click on this button for whtasapp Verify:
+            </small>
+            <a href="{{ task.whatsapp_submission_link }}" target="_blank" class="btn btn-sm btn-whatsapp">
+                <i class="bi bi-whatsapp"></i> Notify Admin via WhatsApp
+            </a>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
+</div>
+{% endif %}
     
     <!-- Admin Verification -->
     {% if user_role == 'admin' and task.status == 'submitted' %}

@@ -9,7 +9,8 @@
         <p style="color: rgba(255,255,255,0.9);">Task Performance & Statistics</p>
     </div>
     <div class="nav-actions">
-        <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+        <a href="{{ url_for('export_excel', start_date=filters.start_date, end_date=filters.end_date, employee_id=filters.employee) }}" 
+           class="btn btn-success" title="Download filtered Excel report">
             <i class="bi bi-file-earmark-excel"></i> Export Excel
         </a>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline" style="border-color: white; color: white;">
@@ -58,16 +59,18 @@
     </div>
 </div>
 
-<!-- Filters -->
+<!-- ✅ ENHANCED Filters Section with Date Range -->
 <div class="card">
     <div class="card-header">
         <i class="bi bi-funnel"></i> Filter Reports
     </div>
     <div class="card-body">
-        <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
-            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
+        <form method="GET" id="filterForm" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
+            
+            <!-- Employee Filter -->
+            <div class="form-group" style="margin:0; flex:1; min-width: 180px;">
                 <label class="form-label">Filter Employee</label>
-                <select class="form-control" name="employee">
+                <select class="form-control" name="employee" id="filterEmployee">
                     <option value="">All Employees</option>
                     {% for emp in employees %}
                     <option value="{{ emp.id }}" {% if filters.employee == emp.id|string %}selected{% endif %}>
@@ -76,9 +79,11 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
+            
+            <!-- Status Filter -->
+            <div class="form-group" style="margin:0; flex:1; min-width: 180px;">
                 <label class="form-label">Filter Status</label>
-                <select class="form-control" name="status">
+                <select class="form-control" name="status" id="filterStatus">
                     <option value="">All Status</option>
                     <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
                     <option value="in_progress" {% if filters.status == 'in_progress' %}selected{% endif %}>In Progress</option>
@@ -86,17 +91,30 @@
                     <option value="verified" {% if filters.status == 'verified' %}selected{% endif %}>Verified</option>
                 </select>
             </div>
-            <div class="form-group" style="margin:0; flex:1; min-width: 200px;">
-                <label class="form-label">Date Range</label>
-                <select class="form-control" name="date_range">
-                    <option value="">All Time</option>
-                    <option value="today" {% if filters.date_range == 'today' %}selected{% endif %}>Today</option>
-                    <option value="overdue" {% if filters.date_range == 'overdue' %}selected{% endif %}>Overdue</option>
-                </select>
+            
+            <!-- ✅ NEW: From Date Filter -->
+            <div class="form-group" style="margin:0; flex:1; min-width: 180px;">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" name="start_date" id="filterStartDate" 
+                       value="{{ filters.start_date or '' }}">
             </div>
-            <button type="submit" class="btn btn-primary" style="margin-bottom: 1.5rem;">
-                <i class="bi bi-search"></i> Apply Filter
-            </button>
+            
+            <!-- ✅ NEW: To Date Filter -->
+            <div class="form-group" style="margin:0; flex:1; min-width: 180px;">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" name="end_date" id="filterEndDate" 
+                       value="{{ filters.end_date or '' }}">
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+                <a href="{{ url_for('reports') }}" class="btn btn-outline" title="Clear all filters">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            </div>
         </form>
     </div>
 </div>
@@ -105,7 +123,12 @@
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
         <i class="bi bi-table"></i> Detailed Task Log
-        <span style="font-size: 0.9rem; font-weight: 400;">({{ tasks|length }} tasks)</span>
+        <span style="font-size: 0.9rem; font-weight: 400;">
+            ({{ tasks|length }} tasks 
+            {% if filters.start_date or filters.end_date or filters.employee or filters.status %}
+            • Filtered
+            {% endif %})
+        </span>
     </div>
     <div class="card-body">
         {% if tasks %}
@@ -119,6 +142,7 @@
                         <th>Status</th>
                         <th>Priority</th>
                         <th>Deadline</th>
+                        <th>Created</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -126,7 +150,7 @@
                     {% for task in tasks %}
                     <tr>
                         <td style="font-weight: 700; color: var(--primary);">{{ task.task_id }}</td>
-                        <td>{{ task.title[:50] }}{% if task.title|length > 50 %}...{% endif %}</td>
+                        <td title="{{ task.title }}">{{ task.title[:40] }}{% if task.title|length > 40 %}...{% endif %}</td>
                         <td>{{ task.employee.name if task.employee else 'N/A' }}</td>
                         <td>
                             <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
@@ -144,15 +168,19 @@
                             {% if task.deadline %}
                                 {{ task.deadline.strftime('%Y-%m-%d') }}
                                 {% if task.deadline < now and task.status != 'verified' %}
-                                <span style="color: var(--danger); font-size: 0.75rem;">⚠️ Overdue</span>
+                                <br><span style="color: var(--danger); font-size: 0.7rem;">⚠️ Overdue</span>
                                 {% endif %}
                             {% else %}
                                 N/A
                             {% endif %}
                         </td>
+                        <td style="font-size: 0.85rem; color: var(--gray);">
+                            {{ task.created_at.strftime('%Y-%m-%d') if task.created_at else 'N/A' }}
+                        </td>
                         <td>
-                            <a href="{{ url_for('admin_task_detail', task_id=task.id) }}" class="btn btn-sm btn-outline">
-                                <i class="bi bi-eye"></i> View
+                            <a href="{{ url_for('admin_task_detail', task_id=task.id) }}" 
+                               class="btn btn-sm btn-outline" title="View Details">
+                                <i class="bi bi-eye"></i>
                             </a>
                         </td>
                     </tr>
@@ -164,6 +192,9 @@
         <div class="empty-state">
             <i class="bi bi-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
             <p>No tasks found matching your filters.</p>
+            <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline" style="margin-top: 1rem;">
+                <i class="bi bi-arrow-counterclockwise"></i> Clear Filters
+            </a>
         </div>
         {% endif %}
     </div>
@@ -188,16 +219,18 @@ var chartDataDefault = {
         total: [0]
     }
 };
-
-// Set default
 window.chartData = chartDataDefault;
 </script>
 
 {% if chart_data %}
 <script>
 // Load chart data from server
-window.chartData = JSON.parse('{{ chart_data|tojson }}');
-console.log('✅ Chart data loaded successfully');
+try {
+    window.chartData = JSON.parse('{{ chart_data|tojson }}');
+    console.log('✅ Chart data loaded successfully');
+} catch(e) {
+    console.warn('⚠️ Could not parse chart data:', e);
+}
 </script>
 {% endif %}
 
@@ -227,11 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { 
-                            color: textColor,
-                            padding: 15,
-                            font: { size: 12 }
-                        }
+                        labels: { color: textColor, padding: 15, font: { size: 12 } }
                     },
                     tooltip: {
                         backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
@@ -270,18 +299,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         grid: { color: gridColor }
                     },
                     x: {
-                        ticks: { 
-                            color: textColor,
-                            maxRotation: 45,
-                            minRotation: 45
-                        },
+                        ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
                         grid: { display: false }
                     }
                 },
                 plugins: {
-                    legend: {
-                        labels: { color: textColor }
-                    },
+                    legend: { labels: { color: textColor } },
                     tooltip: {
                         backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
                         titleColor: textColor,
@@ -293,6 +316,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // ✅ Auto-submit form on filter change (optional UX improvement)
+    const filterInputs = document.querySelectorAll('#filterForm select, #filterForm input[type="date"]');
+    filterInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            // Uncomment below line to auto-apply filters on change
+            // document.getElementById('filterForm').submit();
+        });
+    });
 });
 </script>
 {% endblock %}

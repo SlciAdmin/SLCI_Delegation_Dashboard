@@ -67,7 +67,7 @@ class Task(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('delegation.users.id'), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('delegation.users.id'), nullable=False)
     verified_by = db.Column(db.Integer, db.ForeignKey('delegation.users.id'), nullable=True)
-    
+    submission_notes = db.Column(db.Text) 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime, nullable=True)
     verified_at = db.Column(db.DateTime, nullable=True)

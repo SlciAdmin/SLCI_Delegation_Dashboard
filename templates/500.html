@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}500 - Server Error{% endblock %}
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+    <i class="bi bi-exclamation-triangle" style="font-size: 5rem; color: var(--danger); margin-bottom: 1rem;"></i>
+    <h1 style="color: white; font-size: 2.5rem; margin-bottom: 1rem;">500 - Server Error</h1>
+    <p style="color: rgba(255,255,255,0.9); margin-bottom: 2rem;">Something went wrong. Please try again later.</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-house"></i> Go Home
+    </a>
+</div>
+{% endblock %}
